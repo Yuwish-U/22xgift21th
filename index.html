@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>礼物</title>
+<style>
+    /* 基础设置与横屏9:16 */
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #111; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #game-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    #screen { position: relative; width: 56.25vh; height: 100vh; max-width: 100vw; max-height: 177.77vw; background: #4A90E2; overflow: hidden; transition: background 0.5s; }
+    
+    /* 星星点击特效 */
+    .star-click { position: absolute; width: 20px; height: 20px; background: radial-gradient(circle, #fff, rgba(255,255,255,0)); border-radius: 50%; pointer-events: none; animation: starFade 0.6s ease-out forwards; z-index: 9999; }
+    @keyframes starFade { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+
+    /* 插画包浆滤镜 (微微做旧) */
+    .illustration { filter: sepia(0.3) contrast(0.9) brightness(0.95) blur(0.3px); user-select: none; }
+
+    /* 界面1：黄蓝渐变背景与标题 */
+    #page1 { position: absolute; inset: 0; background: linear-gradient(135deg, #F5D76E, #4A90E2); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+    #page1 img { position: absolute; transition: opacity 1s, transform 1s; opacity: 0; }
+    #biaoti { width: 80%; top: 30%; transform: translateY(-20px); }
+    #xiaobiaoti { width: 60%; top: 55%; transform: translateX(-20px); }
+    .show { opacity: 1 !important; transform: translate(0) !important; }
+
+    /* 主界面桌子与抽屉 */
+    #main-room { position: absolute; inset: 0; z-index: 5; display: none; background: #e8d5b7; }
+    .table-top { position: absolute; top: 40%; left: 0; width: 100%; height: 60%; background: #8b5a2b; border-top: 10px solid #5c3a21; box-shadow: 0 -5px 15px rgba(0,0,0,0.3); }
+    .drawer { position: absolute; top: 70%; left: 20%; width: 60%; height: 15%; background: #6b4423; border: 4px solid #3d2512; border-radius: 5px; cursor: pointer; transition: all 0.5s; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+    .drawer::after { content: ''; width: 30%; height: 10px; background: #3d2512; border-radius: 5px; }
+    .drawer.open { top: 100%; transform: scale(2); opacity: 0; }
+    
+    /* 抽屉内部 (俯视) */
+    #drawer-inside { position: absolute; inset: 0; z-index: 15; background: #4a301a; display: none; justify-content: center; align-items: center; }
+    .drawer-item { position: absolute; width: 30%; filter: sepia(0.2) drop-shadow(5px 5px 10px rgba(0,0,0,0.5)); cursor: pointer; transition: transform 0.3s; }
+    .drawer-item:hover { transform: scale(1.05) rotate(0deg) !important; }
+    #item-guajian { top: 20%; left: 15%; transform: rotate(-15deg); }
+    #item-erding { top: 40%; right: 15%; transform: rotate(10deg); width: 35%; }
+    #item-shoutao { bottom: 15%; left: 30%; transform: rotate(-5deg); width: 40%; }
+    
+    /* 放大展示与手机弹窗界面 */
+    #zoom-view { position: absolute; inset: 0; z-index: 20; display: none; background: rgba(0,0,0,0.8); }
+    .zoom-img { position: absolute; width: 45%; top: 25%; filter: sepia(0.2) drop-shadow(0 0 20px rgba(0,0,0,0.8)); transition: all 0.5s; }
+    .zoom-img.left { left: 5%; }
+    .zoom-img.right { right: 5%; }
+    
+    /* 写实手机弹窗 */
+    .phone-mockup { position: absolute; width: 40%; height: 60%; top: 20%; background: #fff; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border: 8px solid #333; }
+    .phone-mockup.left { left: 5%; }
+    .phone-mockup.right { right: 5%; }
+    .wx-icon { width: 60px; height: 60px; background: #07C160; border-radius: 15px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    .wx-icon svg { fill: white; width: 40px; height: 40px; }
+    
+    /* 聊天界面 */
+    #chat-view { position: absolute; inset: 0; z-index: 30; display: none; background: #ededed; flex-direction: column; }
+    .chat-header { background: #f8f8f8; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #ddd; font-size: 16px; }
+    .chat-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+    .msg { display: flex; align-items: flex-start; gap: 10px; opacity: 0; transition: opacity 0.5s; }
+    .msg.show { opacity: 1; }
+    .msg.right { flex-direction: row-reverse; }
+    .avatar { width: 40px; height: 40px; border-radius: 5px; object-fit: cover; }
+    .bubble { background: #fff; padding: 10px; border-radius: 5px; max-width: 70%; font-size: 14px; line-height: 1.4; position: relative; word-wrap: break-word; }
+    .msg.right .bubble { background: #95EC69; }
+    .bubble img { width: 100%; border-radius: 5px; }
+    
+    /* 门与海景 */
+    #door-view { position: absolute; inset: 0; z-index: 40; display: none; background: #000; }
+    .door { width: 100%; height: 100%; background: #5c3a21; transition: transform 1s; transform-origin: left; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+    .door::after { content: '点击开门'; color: #fff; font-size: 20px; }
+    #helmet-view { position: absolute; inset: 0; z-index: 41; display: none; background: #333; justify-content: center; align-items: flex-end; padding-bottom: 20%; }
+    #helmet { width: 150px; filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); font-size: 100px; }
+    
+    /* 黑屏、海边、结尾 */
+    #black-screen { position: absolute; inset: 0; z-index: 50; background: #000; display: none; }
+    #sea-view { position: absolute; inset: 0; z-index: 51; display: none; background: url('daizheai.jpg') center/cover; flex-direction: column; justify-content: center; align-items: center; }
+    #sea-view::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, #ff7e5f, #feb47b); opacity: 0.6; }
+    #ending-view { position: absolute; inset: 0; z-index: 60; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+    #ending-view img { max-width: 80%; opacity: 0; transition: opacity 1.5s; }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="screen">
+        <!-- 界面1 -->
+        <div id="page1" style="display: flex;">
+            <img src="biaoti.jpg" id="biaoti" class="illustration" alt="标题">
+            <img src="xiaobiaoti.jpg" id="xiaobiaoti" class="illustration" alt="小标题">
+        </div>
+
+        <!-- 主界面/桌子 -->
+        <div id="main-room">
+            <div class="table-top"></div>
+            <div class="drawer" id="drawer-btn"></div>
+            <!-- 角落的钥匙 -->
+            <img src="yaoshi.jpg" id="key-corner" class="illustration" style="position: absolute; bottom: 10%; right: 10%; width: 50px; display: none; cursor: pointer;">
+        </div>
+
+        <!-- 抽屉内部 -->
+        <div id="drawer-inside">
+            <img src="guajian.jpg" class="drawer-item" id="item-guajian" data-target="guajian">
+            <img src="erdingzzx.jpg" class="drawer-item" id="item-erding" data-target="erding">
+            <img src="shoutao2.jpg" class="drawer-item" id="item-shoutao" data-target="shoutao">
+        </div>
+
+        <!-- 放大展示区 -->
+        <div id="zoom-view">
+            <img src="" id="zoom-img" class="zoom-img illustration">
+            <div class="phone-mockup" id="phone-mockup">
+                <div class="wx-icon" id="open-chat">
+                    <svg viewBox="0 0 1024 1024"><path d="M678.4 532.48c-12.8 0-21.76-8.96-21.76-21.76 0-12.8 8.96-21.76 21.76-21.76 12.8 0 21.76 8.96 21.76 21.76 0 12.8-8.96 21.76-21.76 21.76z m-125.44 0c-12.8 0-21.76-8.96-21.76-21.76 0-12.8 8.96-21.76 21.76-21.76 12.8 0 21.76 8.96 21.76 21.76 0 12.8-8.96 21.76-21.76 21.76z m243.2-165.12c-8.96 0-14.08-5.12-14.08-14.08 0-8.96 5.12-14.08 14.08-14.08 8.96 0 14.08 5.12 14.08 14.08 0 8.96-5.12 14.08-14.08 14.08z m-78.08 0c-8.96 0-14.08-5.12-14.08-14.08 0-8.96 5.12-14.08 14.08-14.08 8.96 0 14.08 5.12 14.08 14.08 0 8.96-5.12 14.08-14.08 14.08z m-318.72 12.8c-8.96 0-17.92-8.96-17.92-17.92 0-8.96 8.96-17.92 17.92-17.92 8.96 0 17.92 8.96 17.92 17.92 0 8.96-8.96 17.92-17.92 17.92z m-112.64 0c-8.96 0-17.92-8.96-17.92-17.92 0-8.96 8.96-17.92 17.92-17.92 8.96 0 17.92 8.96 17.92 17.92 0 8.96-8.96 17.92-17.92 17.92z" fill="#ffffff" opacity="0"></path><path d="M512 0C229.12 0 0 191.36 0 427.52c0 136.32 79.36 258.56 203.52 335.36-6.4 23.04-20.48 83.2-23.04 96-3.84 19.2 7.68 19.2 15.36 13.44 6.4-4.48 80-56.32 112-78.08 67.84 20.48 140.8 31.36 215.04 31.36 282.88 0 512-191.36 512-427.52C1024 191.36 794.88 0 512 0z" fill="#fff"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聊天界面 -->
+        <div id="chat-view">
+            <div class="chat-header" id="chat-title">平安健康皆是福</div>
+            <div class="chat-body" id="chat-body"></div>
+        </div>
+
+        <!-- 门与头盔 -->
+        <div id="door-view">
+            <div class="door" id="door-click"></div>
+        </div>
+        <div id="helmet-view">
+            <div id="helmet" class="illustration">🪖</div>
+        </div>
+
+        <!-- 海边与结尾 -->
+        <div id="black-screen"></div>
+        <div id="sea-view"></div>
+        <div id="ending-view">
+            <img src="21.jpg" id="end-21" class="illustration">
+            <img src="kgo.jpg" id="end-kgo" class="illustration">
+        </div>
+    </div>
+</div>
+
+<!-- 音频标签，请确保文件存在 -->
+<audio id="bgm" src="keepgoingon.mp3" loop></audio>
+<audio id="houzuo" src="houzuo.mp3"></audio>
+<audio id="zhkgo" src="zhkgo.mp3"></audio>
+
+<script>
+    // 音频 DOM
+    const bgm = document.getElementById('bgm');
+    const sfxHouzuo = document.getElementById('houzuo');
+    const sfxZhKgo = document.getElementById('zhkgo');
+
+    // 状态机
+    let clickCount = 0;
+    let currentScene = 'page1';
+    let currentZoomTarget = '';
+    let currentChatIndex = 0;
+    let chatData = [];
+    
+    // DOM
+    const screen = document.getElementById('screen');
+    const page1 = document.getElementById('page1');
+    const mainRoom = document.getElementById('main-room');
+    const drawerBtn = document.getElementById('drawer-btn');
+    const drawerInside = document.getElementById('drawer-inside');
+    const zoomView = document.getElementById('zoom-view');
+    const phoneMockup = document.getElementById('phone-mockup');
+    const zoomImg = document.getElementById('zoom-img');
+    const chatView = document.getElementById('chat-view');
+    const chatBody = document.getElementById('chat-body');
+    const chatTitle = document.getElementById('chat-title');
+    const doorView = document.getElementById('door-view');
+    const helmetView = document.getElementById('helmet-view');
+    const blackScreen = document.getElementById('black-screen');
+    const seaView = document.getElementById('sea-view');
+    const endingView = document.getElementById('ending-view');
+
+    // 星星特效与BGM
+    document.addEventListener('click', (e) => {
+        const star = document.createElement('div');
+        star.className = 'star-click';
+        star.style.left = e.clientX + 'px';
+        star.style.top = e.clientY + 'px';
+        document.body.appendChild(star);
+        setTimeout(() => star.remove(), 600);
+
+        if (bgm.paused && currentScene !== 'page1') { // 延迟到第二屏播放
+            bgm.volume = 0.5;
+            bgm.play().catch(e => console.log("需交互播放"));
+        }
+    });
+
+    // 界面1 动画
+    setTimeout(() => { document.getElementById('biaoti').classList.add('show'); }, 500);
+    setTimeout(() => { document.getElementById('xiaobiaoti').classList.add('show'); }, 2000);
+
+    // 界面1 点击流转
+    screen.addEventListener('click', (e) => {
+        if (currentScene === 'page1') {
+            if (e.target.closest('#drawer-inside') || e.target.closest('#zoom-view') || e.target.closest('#drawer-btn')) return;
+            clickCount++;
+            if (clickCount === 3) {
+                page1.style.display = 'none';
+                mainRoom.style.display = 'block';
+                currentScene = 'mainRoom';
+                if (bgm.paused) { bgm.volume = 0.5; bgm.play().catch(()=>{}); }
+            }
+        }
+    });
+
+    // 抽屉
+    drawerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentScene === 'mainRoom') {
+            drawerBtn.classList.add('open');
+            setTimeout(() => {
+                mainRoom.style.display = 'none';
+                drawerInside.style.display = 'flex';
+                currentScene = 'drawerInside';
+                drawerBtn.classList.remove('open');
+                document.getElementById('key-corner').style.display = 'block';
+            }, 500);
+        }
+    });
+
+    drawerInside.addEventListener('click', (e) => {
+        if (e.target === drawerInside) {
+            drawerInside.style.display = 'none';
+            mainRoom.style.display = 'block';
+            currentScene = 'mainRoom';
+        }
+    });
+
+    // 物品点击
+    document.querySelectorAll('.drawer-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentZoomTarget = item.dataset.target;
+            showZoomView(currentZoomTarget);
+        });
+    });
+
+    function showZoomView(target) {
+        drawerInside.style.display = 'none';
+        zoomView.style.display = 'block';
+        document.getElementById('open-chat').onclick = openNormalChat; // 重置点击事件
+        
+        if (target === 'erding' || target === 'shoutao') {
+            zoomImg.className = 'zoom-img left illustration';
+            phoneMockup.className = 'phone-mockup right';
+            zoomImg.src = target === 'erding' ? 'erdingzzx.jpg' : 'shoutao2.jpg';
+        } else {
+            zoomImg.className = 'zoom-img right illustration';
+            phoneMockup.className = 'phone-mockup left';
+            zoomImg.src = 'guajian.jpg';
+        }
+        currentScene = 'zoomView';
+    }
+
+    function openNormalChat(e) {
+        e.stopPropagation();
+        zoomView.style.display = 'none';
+        chatView.style.display = 'flex';
+        currentScene = 'chat';
+        setupChat(currentZoomTarget);
+    }
+
+    const avatars = {
+        '朱志鑫': 'zzxtouxiang.jpg', '左航': 'zhtouxiang.jpg', '张泽禹': 'zzytouxiang.jpg', '张极': 'zjtouxiang.jpg', '苏新皓': 'sxhtouxiang.jpg'
+    };
+
+    function setupChat(target) {
+        chatBody.innerHTML = '';
+        currentChatIndex = 0;
+        chatTitle.innerText = '平安健康皆是福';
+        
+        if (target === 'erding') {
+            chatData = [
+                { user: '朱志鑫', type: 'img', content: 'erdingzzx.jpg' }, { user: '朱志鑫', type: 'text', content: '喜欢' },
+                { user: '朱志鑫', type: 'text', content: '但是你怎么想起来给我买克罗心了？' }, { user: '左航', type: 'img', content: 'erdingzh.jpg' },
+                { user: '左航', type: 'text', content: '一人一只' }, { user: '朱志鑫', type: 'text', content: '左航好像喜欢朱志鑫' },
+                { user: '左航', type: 'text', content: '可以把好像去掉' }
+            ];
+        } else if (target === 'guajian') {
+            chatData = [
+                { user: '朱志鑫', type: 'img', content: 'guajian.jpg' }, { user: '朱志鑫', type: 'text', content: '这是我俩吗？' },
+                { user: '左航', type: 'text', content: '对啊' }, { user: '左航', type: 'text', content: '和我的兄弟们全部都坐上了DDBACKSEAT' },
+                { user: '朱志鑫', type: 'text', content: '你咋还有空去拼豆' }, { user: '左航', type: 'text', content: '以为谁都跟你一样天天在家打游戏啊' },
+                { user: '朱志鑫', type: 'text', content: '对了，说到游戏。' }, { user: '朱志鑫', type: 'text', content: '上号。' }
+            ];
+        } else if (target === 'shoutao') {
+            chatData = [
+                { user: '朱志鑫', type: 'text', content: '怎么还在给我买礼物？' }, { user: '朱志鑫', type: 'img', content: 'shoutao.jpg' },
+                { user: '左航', type: 'text', content: '觉得你会喜欢就买了' }, { user: '左航', type: 'text', content: '（引用朱志鑫发送shoutao.jpg的消息）这把有感觉' },
+                { user: '朱志鑫', type: 'text', content: '左航' }, { user: '朱志鑫', type: 'text', content: '今年跟我一块过年吧' },
+                { user: '朱志鑫', type: 'text', content: '我带你去滑雪' }, { user: '左航', type: 'text', content: '考虑！' }
+            ];
+        }
+        renderNextMessage();
+    }
+
+    function renderNextMessage() {
+        if (currentChatIndex >= chatData.length) return;
+        const msg = chatData[currentChatIndex];
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `msg ${msg.user === '左航' ? '' : 'right'}`;
+        let bubbleContent = msg.type === 'text' ? msg.content : `<img src="${msg.content}" style="max-width: 150px; border-radius: 4px;">`;
+        msgDiv.innerHTML = `<img src="${avatars[msg.user]}" class="avatar"><div class="bubble">${bubbleContent}</div>`;
+        chatBody.appendChild(msgDiv);
+        chatBody.scrollTop = chatBody.scrollHeight;
+        setTimeout(() => msgDiv.classList.add('show'), 50);
+        currentChatIndex++;
+    }
+
+    chatView.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentScene !== 'chat') return;
+
+        if (currentChatIndex < chatData.length) {
+            renderNextMessage();
+        } else {
+            if (currentZoomTarget === 'yaoshi') {
+                if (!document.getElementById('wx-extra')) {
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = `msg`; msgDiv.id = 'wx-extra';
+                    msgDiv.innerHTML = `<img src="${avatars['左航']}" class="avatar"><div class="bubble">小区门口等你。</div>`;
+                    chatBody.appendChild(msgDiv);
+                    setTimeout(() => msgDiv.classList.add('show'), 50);
+                } else {
+                    triggerDoorSequence(); // 再次点击进入门
+                }
+            } else {
+                chatView.style.display = 'none';
+                drawerInside.style.display = 'flex';
+                currentScene = 'drawerInside';
+            }
+        }
+    });
+
+    // 钥匙交互
+    document.getElementById('key-corner').addEventListener('click', (e) => {
+        e.stopPropagation();
+        currentZoomTarget = 'yaoshi';
+        zoomView.style.display = 'block';
+        zoomImg.className = 'zoom-img right illustration';
+        zoomImg.src = 'yaoshi.jpg';
+        phoneMockup.className = 'phone-mockup left';
+        currentScene = 'zoomView';
+        
+        document.getElementById('open-chat').onclick = (ev) => {
+            ev.stopPropagation();
+            zoomView.style.display = 'none';
+            chatView.style.display = 'flex';
+            currentScene = 'chat';
+            chatTitle.innerText = 'eagle';
+            chatBody.innerHTML = '';
+            currentChatIndex = 0;
+            chatData = [
+                { user: '张泽禹', type: 'text', content: '左航出去骑车了？' }, { user: '张极', type: 'text', content: '你怎么知道？' },
+                { user: '苏新皓', type: 'text', content: '应该是听到声音了吧！' }, { user: '苏新皓', type: 'text', content: '我也听到了的！' },
+                { user: '朱志鑫', type: 'text', content: '怎么可能。' }, { user: '朱志鑫', type: 'text', content: '他车钥匙在我这儿啊！' }
+            ];
+            renderNextMessage();
+        };
+    });
+
+    function triggerDoorSequence() {
+        chatView.style.display = 'none';
+        zoomView.style.display = 'none';
+        doorView.style.display = 'block';
+        currentScene = 'door';
+    }
+
+    document.getElementById('door-click').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentScene === 'door') {
+            doorView.style.transform = 'scaleX(0)';
+            setTimeout(() => {
+                doorView.style.display = 'none';
+                helmetView.style.display = 'flex';
+                currentScene = 'helmet';
+            }, 1000);
+        }
+    });
+
+    helmetView.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (currentScene === 'helmet') {
+            helmetView.style.display = 'none';
+            blackScreen.style.display = 'block';
+            currentScene = 'black';
+            
+            sfxHouzuo.play();
+            sfxHouzuo.onended = () => {
+                blackScreen.style.display = 'none';
+                seaView.style.display = 'flex';
+                currentScene = 'sea';
+                
+                sfxZhKgo.play();
+                sfxZhKgo.onended = () => {
+                    seaView.style.display = 'none';
+                    blackScreen.style.display = 'block';
+                    currentScene = 'black2';
+                    
+                    setTimeout(() => {
+                        blackScreen.style.display = 'none';
+                        endingView.style.display = 'flex';
+                        document.getElementById('end-21').classList.add('show');
+                        setTimeout(() => { document.getElementById('end-kgo').classList.add('show'); }, 1500);
+                    }, 1000);
+                };
+            };
+        }
+    });
+</script>
+</body>
+</html>
